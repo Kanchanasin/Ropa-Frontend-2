@@ -31,7 +31,7 @@ export default function LoginPage() {
         setErrorMessage("");
 
         try {
-            const res = await fetch("http://localhost:8000/api/v1/auth/login", {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1/auth/login`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ email, password }),
@@ -58,27 +58,30 @@ export default function LoginPage() {
                     case "admin":
                         router.push("/users");
                         break;
-                    case "DPO":
+                    case "dpo":
                         router.push("/dpo");
                         break;
-                    case "Data Owner":
+                    case "data_owner":
                         router.push("/ropa/controller");
                         break;
-                    case "Executive":
+                    case "executive":
                         router.push("/dashboard");
                         break;
-                    case "Auditor":
+                    case "auditor":
                         router.push("/ropa/controller");
                         break;
+                    case "developer":
+                        router.push("/users");
+                        break;
                     default:
-                        // กรณีหา Role ไม่เจอ หรือเป็น Role อื่นๆ
+
                         router.push("/ropa"); 
                         break;
                 }
 
             } catch (decodeError) {
                 console.error("Token decoding failed:", decodeError);
-                // ถ้า Token มีปัญหาหรือไม่สามารถ Decode ได้ ให้ส่งไปหน้าแรก
+
                 router.push("/");
             }
 

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
+import type { ApexOptions } from "apexcharts";
 interface TokenPayload {
   sub?: string;
   role?: string;
@@ -11,14 +12,14 @@ interface TokenPayload {
 import { jwtDecode } from "jwt-decode";
 
 const Chart = dynamic(() => import("react-apexcharts"), { ssr: false });
-const API_DASHBOARD_URL = "http://localhost:8000/api/v1/dashboard/summary";
+const API_DASHBOARD_URL = `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1/dashboard/summary`;
 
 // ==========================================
 // ApexCharts Components
 // ==========================================
 
 function HorizontalBarChart({ data, colors }: { data: { name: string; count: number }[]; colors: string[] }) {
-  const options = {
+  const options: ApexOptions = {
     chart: { type: "bar", toolbar: { show: false }, fontFamily: "inherit" },
     plotOptions: { bar: { horizontal: true, borderRadius: 4, barHeight: "60%", distributed: true } },
     dataLabels: { enabled: true, style: { fontSize: "11px", fontWeight: 600 } },
@@ -43,72 +44,7 @@ function HorizontalBarChart({ data, colors }: { data: { name: string; count: num
     </div>
   );
 }
-
-// function DonutChartApex() {
-//   const options = {
-//     chart: { type: "donut", fontFamily: "inherit" },
-//     labels: ["ข้อมูลทั่วไป", "ข้อมูลอ่อนไหว", "ข้อมูลทางการเงิน", "ข้อมูลสุขภาพ"],
-//     colors: ["#2563eb", "#dc2626", "#d97706", "#16a34a"],
-//     plotOptions: {
-//       pie: {
-//         donut: {
-//           size: "65%",
-//           labels: {
-//             show: true,
-//             total: { show: true, label: "ทั้งหมด", fontSize: "12px", color: "#64748b", formatter: () => "142" },
-//             value: { fontSize: "18px", fontWeight: 700, color: "#1e293b" },
-//           },
-//         },
-//       },
-//     },
-//     dataLabels: { enabled: false },
-//     legend: {
-//       position: "bottom",
-//       fontSize: "11px",
-//       markers: { size: 8 },
-//       itemMargin: { horizontal: 8 },
-//     },
-//     stroke: { width: 2 },
-//     tooltip: { theme: "light" },
-//   };
-
-//   const series = typeData.map((d) => d.count);
-
-//   return (
-//     <div className="-mx-2">
-//       <Chart type="donut" options={options} series={series} height={260} />
-//     </div>
-//   );
-// }
-
-// function AreaChartApex() {
-//   const options = {
-//     chart: { type: "area", toolbar: { show: false }, fontFamily: "inherit", sparkline: { enabled: false } },
-//     stroke: { curve: "smooth", width: 2 },
-//     fill: { type: "gradient", gradient: { shadeIntensity: 1, opacityFrom: 0.25, opacityTo: 0.02, stops: [0, 100] } },
-//     colors: ["#2563eb"],
-//     xaxis: {
-//       categories: trendLabels,
-//       labels: { style: { fontSize: "11px", colors: "#94a3b8" } },
-//       axisBorder: { show: false },
-//       axisTicks: { show: false },
-//     },
-//     yaxis: { labels: { style: { fontSize: "11px", colors: "#94a3b8" } } },
-//     grid: { borderColor: "#f1f5f9", strokeDashArray: 4 },
-//     markers: { size: 4, colors: ["#2563eb"], strokeColors: "#fff", strokeWidth: 2 },
-//     dataLabels: { enabled: false },
-//     tooltip: { theme: "light", x: { show: true } },
-//   };
-
-//   const series = [{ name: "รายการที่เพิ่ม", data: trendValues }];
-
-//   return (
-//     <div className="-mx-2">
-//       <Chart type="area" options={options} series={series} height={180} />
-//     </div>
-//   );
-// }
-
+    
 // ==========================================
 // Main Page
 // ==========================================
@@ -121,6 +57,7 @@ export default function DashboardPage() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isRopaMenuOpen, setIsRopaMenuOpen] = useState(false);
+  const [navPerms, setNavPerms] = useState({ canSeeDashboard: true, canSeeDPO: false, canSeeRopa: false, canSeeUsers: false });
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -140,10 +77,29 @@ export default function DashboardPage() {
 
         // ถอดรหัส Token เพื่อเอาชื่อผู้ใช้
         const decoded = jwtDecode<TokenPayload>(token);
+
+        // 🔒 Route Guard: เฉพาะ Executive และ Auditor เท่านั้นเข้าหน้านี้ได้
+        const role = (decoded.role || "").toString();
+        const allowedRoles = ["Executive", "Auditor", "developer"];
+        const isAllowed = allowedRoles.some(r => role.toLowerCase() === r.toLowerCase());
+        if (!isAllowed) {
+          router.push("/login");
+          return;
+        }
+
         setCurrentUser({
           name: decoded.sub || "Unknown User",
           role: decoded.role || "No Role",
           initials: (decoded.sub || "U").substring(0, 2).toUpperCase()
+        });
+
+        // 🔒 Sidebar visibility per role
+        const r = (decoded.role || "").toLowerCase();
+        setNavPerms({
+          canSeeDashboard: ["executive","auditor","developer"].includes(r),
+          canSeeDPO:       ["dpo","auditor","developer"].includes(r),
+          canSeeRopa:      ["data_owner","auditor","developer"].includes(r),
+          canSeeUsers:     ["admin","developer","auditor"].includes(r),
         });
 
         // 🎯 ยิง API ไปหา FastAPI
@@ -167,23 +123,10 @@ export default function DashboardPage() {
     fetchDashboardSummary();
   }, [router]);
 
-  // const handleLogout = () => {
-  //   localStorage.removeItem("token");
-  //   localStorage.removeItem("user");
-  //   router.push("/login");
-  // };
 
-  if (isLoading) {
-    return (
-      <div className="h-screen flex flex-col items-center justify-center bg-slate-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-        <p className="text-slate-500 font-medium text-sm">กำลังโหลดข้อมูลแดชบอร์ด...</p>
-      </div>
-    );
-  }
 
   const statCards = dashboardData?.statCards ? [
-    { label: "จำนวนรายการ ROPA ทั้งหมด", value: dashboardData.statCards.total, badge: "ทั้งหมด", cls: " text-blue-600 border border-blue-200" },
+    { label: "จำนวนรายการ ROPA ทั้งหมด", value: dashboardData.statCards.total, badge: "All", cls: " text-blue-600 border border-blue-200" },
     { label: "รออนุมัติ", value: dashboardData.statCards.pending, badge: "Pending", cls: " text-amber-600 border border-amber-200" },
     { label: "อนุมัติแล้ว", value: dashboardData.statCards.approved, badge: "Approved", cls: " text-emerald-600 border border-emerald-200" },
     { label: "ถูกปฏิเสธ", value: dashboardData.statCards.rejected, badge: "Rejected", cls: " text-red-600 border border-red-200" },
@@ -211,7 +154,7 @@ export default function DashboardPage() {
 
       {/* ── Header ── */}
       <header className="w-full h-14 bg-slate-900 text-white flex items-center justify-between px-6 shadow-md z-30 shrink-0">
-        <span className="text-lg font-bold tracking-wider">RoPA <span className="text-blue-400">System</span></span>
+        <span className="text-lg font-bold tracking-wider">RoPA <span className="text-blue-400">2077</span></span>
         <div className="relative">
           <button
             aria-label="เมนูผู้ใช้งาน" title="User Menu"
@@ -251,6 +194,7 @@ export default function DashboardPage() {
           <div className="overflow-hidden w-full h-full">
             <div className="w-56 flex flex-col h-full pt-4">
               <nav className="flex-1 space-y-0.5 px-3">
+                {navPerms.canSeeDashboard && (
                 <Link aria-label="ไปที่หน้าแดชบอร์ด" title="Dashboard" href="/dashboard"
                   className="flex items-center px-3 py-2.5 bg-blue-50 text-blue-700 rounded-lg font-medium transition-colors text-xs mb-1">
                   <svg className="w-4 h-4 mr-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -258,6 +202,8 @@ export default function DashboardPage() {
                   </svg>
                   Dashboard
                 </Link>
+                )}
+                {navPerms.canSeeDPO && (
                 <Link aria-label="DPO Workspace" title="DPO Workspace" href="/dpo"
                   className="flex items-center px-3 py-2.5 text-slate-600 hover:bg-slate-50 hover:text-blue-600 rounded-lg font-medium transition-colors text-xs mb-1">
                   <svg className="w-4 h-4 mr-2.5 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -265,6 +211,8 @@ export default function DashboardPage() {
                   </svg>
                   DPO Approval
                 </Link>
+                )}
+                {navPerms.canSeeRopa && (
                 <div className="bg-slate-50 rounded-lg overflow-hidden border border-slate-100">
                   <button aria-label="สลับเมนู RoPA Record" title="RoPA Record Menu"
                     onClick={() => setIsRopaMenuOpen(!isRopaMenuOpen)}
@@ -292,6 +240,8 @@ export default function DashboardPage() {
                     </div>
                   )}
                 </div>
+                )}
+                {navPerms.canSeeUsers && (
                 <Link aria-label="ไปที่หน้าผู้ใช้งาน" title="User Management" href="/users"
                   className="flex items-center px-3 py-2.5 text-slate-600 hover:bg-slate-50 hover:text-blue-600 rounded-lg font-medium transition-colors text-xs mt-1">
                   <svg className="w-4 h-4 mr-2.5 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -299,6 +249,7 @@ export default function DashboardPage() {
                   </svg>
                   User Management
                 </Link>
+                )}
               </nav>
             </div>
           </div>
@@ -326,20 +277,32 @@ export default function DashboardPage() {
 
           {/* Stat Cards */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
-            {statCards.map((s: any) => (
-              <div key={s.label} className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-                <p className="text-[11px] text-slate-500 font-medium mb-1.5">{s.label}</p>
-                <p className="text-3xl font-bold text-slate-800 leading-none mb-2">{s.value}</p>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${s.cls}`}>{s.badge}</span>
-              </div>
-            ))}
+            {isLoading
+              ? Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 animate-pulse">
+                    <div className="h-3 bg-slate-200 rounded w-3/4 mb-3" />
+                    <div className="h-8 bg-slate-200 rounded w-1/2 mb-3" />
+                    <div className="h-4 bg-slate-200 rounded w-1/3" />
+                  </div>
+                ))
+              : statCards.map((s: any) => (
+                  <div key={s.label} className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+                    <p className="text-[11px] text-slate-500 font-medium mb-1.5">{s.label}</p>
+                    <p className="text-3xl font-bold text-slate-800 leading-none mb-2">{s.value}</p>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${s.cls}`}>{s.badge}</span>
+                  </div>
+                ))}
           </div>
 
           {/* Charts Row 1 — Bar charts */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
               <h2 className="text-sm font-bold text-slate-800 mb-1">จำนวนรายการแยกตามหน่วยงาน</h2>
-              {dashboardData?.deptData && dashboardData.deptData.length > 0 ? (
+              {isLoading ? (
+                <div className="animate-pulse space-y-2 mt-2">
+                  {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-4 bg-slate-200 rounded" style={{ width: `${70 - i * 10}%` }} />)}
+                </div>
+              ) : dashboardData?.deptData && dashboardData.deptData.length > 0 ? (
                  <HorizontalBarChart
                    data={dashboardData.deptData}
                    colors={["#2563eb","#0891b2","#7c3aed","#d97706","#16a34a","#dc2626","#64748b"]}
@@ -350,26 +313,21 @@ export default function DashboardPage() {
             </div>
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
               <h2 className="text-sm font-bold text-slate-800 mb-1">จำนวนรายการตามฐานกฎหมาย</h2>
-              {dashboardData?.legalData && dashboardData.legalData.length > 0 ? (
+              {isLoading ? (
+                <div className="animate-pulse space-y-2 mt-2">
+                  {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-4 bg-slate-200 rounded" style={{ width: `${60 - i * 8}%` }} />)}
+                </div>
+              ) : dashboardData?.legalData && dashboardData.legalData.length > 0 ? (
                  <HorizontalBarChart
                    data={dashboardData.legalData}
                    colors={["#2563eb","#7c3aed","#0891b2","#d97706","#16a34a"]}
                  />
               ) : (
-                 <div className="h-[200px] flex items-center justify-center text-xs text-slate-400">ไม่มีข้อมูลฐานกฎหมาย</div>
+                 <div className="h-50 flex items-center justify-center text-xs text-slate-400">ไม่มีข้อมูลฐานกฎหมาย</div>
               )}
-            </div>
-            {/* <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-              <h2 className="text-sm font-bold text-slate-800 mb-3">จำนวนรายการแยกตามประเภทข้อมูล</h2>
-              <DonutChartApex />
-            </div> */}
+              </div>
           </div>
-            {/* <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-              <h2 className="text-sm font-bold text-slate-800 mb-1">แนวโน้มการเพิ่มข้อมูลรายเดือน</h2>
-              <AreaChartApex />
-            </div> */}
-          
-
+            
           {/* Coverage */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
             <h2 className="text-sm font-bold text-slate-800 mb-3">ความครบถ้วนของข้อมูลแต่ละหน่วยงาน</h2>
