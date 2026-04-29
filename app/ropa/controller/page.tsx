@@ -637,8 +637,8 @@ export default function RoPARecordPage() {
                   </button>
                   {isRopaMenuOpen && (
                     <div className="flex flex-col pb-1">
-                      <Link aria-label="ดูข้อมูล Controller" title="Controller Menu" href="/ropa/controller" className={`w-full text-left pl-10 pr-3 py-2 text-xs font-medium transition-colors block ${currentMenu === "Controller" ? "text-blue-700 bg-blue-100/50" : "text-slate-600 hover:text-slate-800 hover:bg-slate-100"}`}>Controller</Link>
-                      <Link aria-label="ดูข้อมูล Processor" title="Processor Menu" href="/ropa/processor" className={`w-full text-left pl-10 pr-3 py-2 text-xs font-medium transition-colors block ${currentMenu === "Processor" ? "text-blue-700 bg-blue-100/50" : "text-slate-600 hover:text-slate-800 hover:bg-slate-100"}`}>Processor</Link>
+                      <Link aria-label="ดูข้อมูล Controller" title="Controller Menu" href="/ropa/controller" className={`w-full text-left pl-10 pr-3 py-2 text-xs font-medium transition-colors block ${(currentMenu as string) === "Controller" ? "text-blue-700 bg-blue-100/50" : "text-slate-600 hover:text-slate-800 hover:bg-slate-100"}`}>Controller</Link>
+                      <Link aria-label="ดูข้อมูล Processor" title="Processor Menu" href="/ropa/processor" className={`w-full text-left pl-10 pr-3 py-2 text-xs font-medium transition-colors block ${(currentMenu as string) === "Processor" ? "text-blue-700 bg-blue-100/50" : "text-slate-600 hover:text-slate-800 hover:bg-slate-100"}`}>Processor</Link>
                     </div>
                   )}
                 </div>
